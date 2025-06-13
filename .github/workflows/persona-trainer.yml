@@ -1,0 +1,26 @@
+name: Personality Trainer
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'  # Domingos 3h
+  workflow_dispatch:
+
+jobs:
+  train-personality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Collect engagement data
+        run: python -m src.analytics.engagement_tracker collect
+      
+      - name: Analyze personality performance
+        run: python -m src.analytics.personality_tuner analyze
+      
+      - name: Update personality weights
+        run: python -m src.personality.core_persona update-weights
+      
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: 'Auto-update personality based on engagement data'

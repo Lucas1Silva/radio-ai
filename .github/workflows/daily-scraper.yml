@@ -1,0 +1,40 @@
+name: Daily Content Scraper
+
+on:
+  schedule:
+    - cron: '0 8,14,20 * * *'  # 8h, 14h, 20h BRT
+  workflow_dispatch:
+
+jobs:
+  scrape-trends:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@latest
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install chromium
+      
+      - name: Run scraper
+        env:
+          SCRAPER_MODE: 'stealth'
+        run: python -m src.scraping.twitter_scraper
+      
+      - name: Analyze trends
+        run: python -m src.scraping.trend_analyzer
+      
+      - name: Trigger content generation
+        if: steps.analyze.outputs.hot_topic == 'true'
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          event-type: generate-conten
+          client-payload: '{"topic": "${{ steps.analyze.outputs.topic }}"}'
