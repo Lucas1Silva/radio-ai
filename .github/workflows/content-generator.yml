@@ -1,0 +1,50 @@
+name: Content Generator
+
+on:
+  repository_dispatch:
+    types: [generate-content]
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: 'Topic to cover'
+        required: true
+
+jobs:
+  generate-episode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Check knowledge base
+        id: knowledge-check
+        run: |
+          python -m src.knowledge.rag_system check "${{ github.event.client_payload.topic }}"
+      
+      - name: Request research (if needed)
+        if: steps.knowledge-check.outputs.needs_research == 'true'
+        uses: peter-evans/create-issue@v4
+        with:
+          title: "Research needed: ${{ github.event.client_payload.topic }}"
+          body: |
+            O tópico **${{ github.event.client_payload.topic }}** está em alta mas não temos informações suficientes.
+            
+            Por favor, adicione links de referência nos comentários.
+          labels: research-needed
+      
+      - name: Generate script
+        if: steps.knowledge-check.outputs.has_knowledge == 'true'
+        run: |
+          python -m src.content_generation.script_writer \
+            --topic "${{ github.event.client_payload.topic }}" \
+            --personality config/personality_config.yml
+      
+      - name: Generate audio
+        run: python -m src.production.text_to_speech
+      
+      - name: Create video
+        run: python -m src.production.video_generator
+      
+      - name: Upload to YouTube
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: python -m src.production.youtube_uploader
